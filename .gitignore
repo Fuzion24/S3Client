@@ -1,0 +1,12 @@
+.DS_Store
+# IDEA Ignores
+*.iml
+*.ipr
+*.iws
+.idea/
+.idea_modules/
+target/
+boot/
+.DS_Store
+.idea
+.idea_modules
