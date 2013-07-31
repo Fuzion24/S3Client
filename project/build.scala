@@ -14,6 +14,7 @@ object Publish {
 
 object Versions {
   val scala     = "2.10.2"
+  val finagle   = "6.5.2"
   val scalatra  = "2.2.0"
   val scalatest = "1.9.1"
 }
@@ -64,7 +65,8 @@ object AWSS3 extends Build {
     },
     libraryDependencies ++= Seq(
 	    "net.databinder.dispatch" %% "dispatch-core" % "0.10.1",
-      "com.twitter" %% "finagle-core" % "6.5.2",
+      "com.twitter"             %% "finagle-core"  % Versions.finagle,
+      "com.twitter"             %% "finagle-http"  % Versions.finagle,
       "com.github.scopt" %% "scopt" % "3.1.0"
     ),
     resolvers += "Twitter Maven repo" at "http://maven.twttr.com/"
