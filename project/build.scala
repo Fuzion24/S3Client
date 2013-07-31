@@ -63,7 +63,8 @@ object AWSS3 extends Build {
       }
     },
     libraryDependencies ++= Seq(
-	    "net.databinder.dispatch" %% "dispatch-core" % "0.10.1"	 
+	    "net.databinder.dispatch" %% "dispatch-core" % "0.10.1",
+      "com.github.scopt" %% "scopt" % "3.1.0"
     )
   )
 }
