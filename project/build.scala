@@ -35,7 +35,7 @@ object AWSS3 extends Build {
       githubRepo   := Publish.githubRepo,
       scalaVersion := Versions.scala,
       jarName in assembly := projectName + ".jar",
-      mainClass in assembly := Some("com.apk.service.web.Standalone"),
+      mainClass in assembly := Some("Main"),
       mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
       {
         case "application.conf" => MergeStrategy.concat
@@ -64,7 +64,9 @@ object AWSS3 extends Build {
     },
     libraryDependencies ++= Seq(
 	    "net.databinder.dispatch" %% "dispatch-core" % "0.10.1",
+      "com.twitter" %% "finagle-core" % "6.5.2",
       "com.github.scopt" %% "scopt" % "3.1.0"
-    )
+    ),
+    resolvers += "Twitter Maven repo" at "http://maven.twttr.com/"
   )
 }
