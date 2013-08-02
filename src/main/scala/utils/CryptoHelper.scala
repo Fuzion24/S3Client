@@ -41,9 +41,9 @@ abstract class IntegrityAlgo(val digestName:String){
     def asBase64 = Base64(asBytes)
 
     lazy val asBytes = {
-      val key = new javax.crypto.spec.SecretKeySpec(key, digestName)
+      val keySpec = new javax.crypto.spec.SecretKeySpec(key, digestName)
       val m = Mac.getInstance(digestName)
-      m.init(key)
+      m.init(keySpec)
       m.update(bytes)
       m.doFinal()
     }
