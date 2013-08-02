@@ -65,9 +65,10 @@ object AWSS3 extends Build {
     },
     libraryDependencies ++= Seq(
 	    "net.databinder.dispatch" %% "dispatch-core" % "0.10.1",
+      "org.scalatest"           %% "scalatest"     % Versions.scalatest % "test",
       "com.twitter"             %% "finagle-core"  % Versions.finagle,
       "com.twitter"             %% "finagle-http"  % Versions.finagle,
-      "com.github.scopt" %% "scopt" % "3.1.0"
+      "com.github.scopt"        %% "scopt"         % "3.1.0"
     ),
     resolvers += "Twitter Maven repo" at "http://maven.twttr.com/"
   )
