@@ -6,10 +6,28 @@ import java.util.Date
 import utils.HMACSHA1
 import utils.MapHelper._
 import net.aws.s3.HTTPVerb.HTTPVerb
+import scala.xml.XML
+import java.text.{SimpleDateFormat, DateFormat}
 
 object S3 {
   val BASE_URL = "s3.amazonaws.com"
 }
+
+object S3Item {
+  def apply(xmlString:String):Seq[S3Item] =
+    for { contents     <- XML.loadString(xmlString) \ "Contents"
+          contentItem  <- contents
+          key          = (contentItem \ "Key").text
+          eTag         = (contentItem \ "ETag").text
+          lastModified = (contentItem \ "LastModified").text
+          size         = (contentItem \ "Size").text
+    } yield S3Item(key, lastModified, size)
+
+  def apply(key:String,lastModified:String,size:String):S3Item =
+    S3Item(key, S3ResultDate.parse(lastModified), Integer.parseInt(size))
+}
+
+case class S3Item(key:String, lastModified:Date, size:Long)
 
 case class AWSCreds(accessKeyID:String, secretAccessKey:String)
 
@@ -71,18 +89,18 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
     )
   ) map(new String(_))
 
-  def list(prefix:Option[String], maxKeys:Option[Int], marker:Option[String]):Future[String] = exec(
+  def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[Seq[S3Item]] = exec(
     S3Request(
       httpVerb = HTTPVerb.GET,
+      bucket   = Option(bucketName),
       urlParams = Map[String,String]() +++
                 ("prefix"   -> prefix) +++
                 ("max-keys" -> maxKeys.map(_.toString)) +++
                 ("marker"   -> marker)
     )
-  ) map(new String(_))
+  ).map { bytes => S3Item(new String(bytes)) }
 
 }
-
 
 object S3RequestSigner {
   def apply(req:S3Request, creds:AWSCreds) =
