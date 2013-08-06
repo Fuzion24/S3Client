@@ -20,7 +20,7 @@ trait DispatchS3HTTPExecutor extends S3RequestExecutor {
   }
 
   protected def toDispatchReq(req:S3Request)(implicit creds:AWSCreds) = {
-    var r = url(s"${req.bucket}.$BASE_URL${req.canonicalizedResource}").
+    var r = url(s"http://$BASE_URL${req.canonicalizedResource}").
       maybeAddHeader("content-type",req.contentType).
       maybeAddHeader("Content-MD5", req.contentMD5).
       addHeader("Date",req.dateString).
@@ -28,6 +28,9 @@ trait DispatchS3HTTPExecutor extends S3RequestExecutor {
     for { (k,seqV) <- req.amzHeaders
           v <- seqV
     } { r = r.addHeader(k,v) }
+
+    for {(k,v) <- req.urlParams}{ r = r.addQueryParameter(k,v)}
+
     r
   }
 
