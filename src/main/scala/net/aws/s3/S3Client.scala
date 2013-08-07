@@ -2,30 +2,18 @@ package net.aws.s3
 
 import java.io.File
 import scala.concurrent.{ExecutionContext, Future}
-import java.util.Date
-import utils.HMACSHA1
 import utils.MapHelper._
-import net.aws.s3.HTTPVerb.HTTPVerb
+import java.util.Date
+import net.aws.s3.HTTPVerb._
 import scala.xml.XML
-import java.text.{SimpleDateFormat, DateFormat}
+import scala.Some
 
 object S3 {
   val BASE_URL = "s3.amazonaws.com"
 }
 
-object S3Item {
-  def apply(xmlString:String):Seq[S3Item] =
-    for { contents     <- XML.loadString(xmlString) \ "Contents"
-          contentItem  <- contents
-          key          = (contentItem \ "Key").text
-          eTag         = (contentItem \ "ETag").text
-          lastModified = (contentItem \ "LastModified").text
-          size         = (contentItem \ "Size").text
-    } yield S3Item(key, lastModified, size)
 
-  def apply(key:String,lastModified:String,size:String):S3Item =
-    S3Item(key, S3ResultDate.parse(lastModified), Integer.parseInt(size))
-}
+case class S3Listing(items:Seq[S3Item], truncated:Boolean, marker:Option[String] = None)
 
 case class S3Item(key:String, lastModified:Date, size:Long)
 
@@ -60,13 +48,12 @@ case class S3Request(httpVerb:HTTPVerb,
 }
 
 
-class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) {  self:S3RequestExecutor =>
 
-  //def put(file:String):Future[String] = put(new File(file))
+class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) {  self:S3RequestExecutor =>
 
   def put(file:File) = exec(
     S3Request(
-      httpVerb    = HTTPVerb.PUT,
+      httpVerb    = PUT,
       bucket      = Option(bucketName),
       contentType = Option("image/jpeg"),
       resource    = Option("photos/puppy.jpg")
@@ -75,7 +62,7 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
 
   def get(key:S3Key):Future[Array[Byte]] = exec(
     S3Request(
-      httpVerb = HTTPVerb.GET,
+      httpVerb = GET,
       bucket   = Option(bucketName),
       resource = Option(key.key)
     )
@@ -83,36 +70,57 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
 
   def delete(key:S3Key):Future[String] = exec(
     S3Request(
-      httpVerb = HTTPVerb.DELETE,
+      httpVerb = DELETE,
       bucket   = Option(bucketName),
       resource = Option(key.key)
     )
   ) map(new String(_))
 
-  def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[Seq[S3Item]] = exec(
+  /*
+  def listAll:Future[Seq[S3Item]] = {
+    def listAllHelper(acc:List[S3Item])
+      list()
+  }
+  */
+
+  def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[S3Listing] = exec(
     S3Request(
-      httpVerb = HTTPVerb.GET,
+      httpVerb = GET,
       bucket   = Option(bucketName),
       urlParams = Map[String,String]() +++
                 ("prefix"   -> prefix) +++
                 ("max-keys" -> maxKeys.map(_.toString)) +++
                 ("marker"   -> marker)
     )
-  ).map { bytes => S3Item(new String(bytes)) }
+  ) map { bytes => S3Listing(new String(bytes)) }
 
 }
 
-object S3RequestSigner {
-  def apply(req:S3Request, creds:AWSCreds) =
-    HMACSHA1(creds.secretAccessKey, getRequestString(req)).asBase64
+object S3Item {
+  def apply(key:String,lastModified:String,size:String):S3Item =
+    S3Item(key, S3ResultDate.parse(lastModified), Integer.parseInt(size))
+}
 
-  private def getRequestString(req:S3Request):String = {
-    val S3Request(httpVerb, bucket, resource, contentMD5, contentType, date, amzHeaders, urlParams) = req
-       s"""$httpVerb
-          |${contentMD5.getOrElse("")}
-          |${contentType.getOrElse("")}
-          |${req.dateString}
-          |${req.canonicalizedAmzHeaders}${req.canonicalizedResource}
-       """.trim.stripMargin
+object S3Listing {
+  def apply(xmlString:String):S3Listing = {
+    val xmlNode   = XML.loadString(xmlString)
+    val truncated = (xmlNode \ "IsTruncated").text.toBoolean
+
+    val marker    = (xmlNode \ "Marker").text.trim match {
+      case ""       => None
+      case s:String => Some(s)
+    }
+
+    val items = for { contents     <- xmlNode \ "Contents"
+                      contentItem  <- contents
+                      key          = (contentItem \ "Key").text
+                      eTag         = (contentItem \ "ETag").text
+                      lastModified = (contentItem \ "LastModified").text
+                      size         = (contentItem \ "Size").text
+    } yield S3Item(key, lastModified, size)
+
+    S3Listing(items, truncated, marker)
   }
 }
+
+
