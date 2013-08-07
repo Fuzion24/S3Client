@@ -5,6 +5,9 @@ import org.scalatest.FunSuite
 
 class S3RequestSigning extends FunSuite {
 
+  /* Examples taken from:
+      http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
+   */
   val creds = AWSCreds("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
 
   test("Get is signedProperly") {

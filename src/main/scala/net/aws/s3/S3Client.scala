@@ -76,12 +76,14 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
     )
   ) map(new String(_))
 
-  /*
   def listAll:Future[Seq[S3Item]] = {
-    def listAllHelper(acc:List[S3Item])
-      list()
+    def listAllHelper(lastList:Future[S3Listing], acc:List[S3Item]):Future[List[S3Item]] = lastList.flatMap{ ll =>
+      if(!ll.truncated) Future { acc ++ ll.items }
+      else
+        listAllHelper(list(marker = Some(ll.items.last.key)), acc ++ ll.items)
+    }
+    listAllHelper(list(),List())
   }
-  */
 
   def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[S3Listing] = exec(
     S3Request(
@@ -105,7 +107,6 @@ object S3Listing {
   def apply(xmlString:String):S3Listing = {
     val xmlNode   = XML.loadString(xmlString)
     val truncated = (xmlNode \ "IsTruncated").text.toBoolean
-
     val marker    = (xmlNode \ "Marker").text.trim match {
       case ""       => None
       case s:String => Some(s)
