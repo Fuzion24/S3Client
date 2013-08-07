@@ -20,10 +20,12 @@ trait DispatchS3HTTPExecutor extends S3RequestExecutor {
   }
 
   protected def toDispatchReq(req:S3Request)(implicit creds:AWSCreds) = {
+    println(s"http://$BASE_URL${req.canonicalizedResource}")
     var r = url(s"http://$BASE_URL${req.canonicalizedResource}").
       maybeAddHeader("content-type",req.contentType).
       maybeAddHeader("Content-MD5", req.contentMD5).
       addHeader("Date",req.dateString).
+      addHeader("Accept-Encoding", "gzip").
       addHeader("Authorization", s"AWS ${creds.accessKeyID}:${S3RequestSigner(req,creds)}")
     for { (k,seqV) <- req.amzHeaders
           v <- seqV

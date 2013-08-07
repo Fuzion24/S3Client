@@ -14,7 +14,11 @@ object S3 {
   val BASE_URL = "s3.amazonaws.com"
 }
 
-case class S3Listing(items:Seq[S3Item], truncated:Boolean, marker:Option[String] = None)
+case class S3BucketContents(items:Seq[S3Item], truncated:Boolean, marker:Option[String] = None)
+
+case class S3BucketListing(buckets:List[S3Bucket])
+
+case class S3Bucket(bucketName:String, creationDate:Option[Date] = None)
 
 case class S3Item(key:String, lastModified:Date, size:Long)
 
@@ -30,7 +34,9 @@ case class S3Request(httpVerb:HTTPVerb,
                      date:Either[Date,String] = Left(new Date()),
                      amzHeaders:Map[String,Seq[String]] = Map(),
                      urlParams:    Map[String,String] = Map()){
-  def canonicalizedResource = s"/${bucket.getOrElse("")}/${resource.getOrElse("")}"
+  def canonicalizedResource =
+    if(bucket.isEmpty && resource.isEmpty) "/"
+    else s"/${bucket.getOrElse("")}/${resource.getOrElse("")}"
 
   def canonicalizedAmzHeaders:String = {
     def sort(headers:Map[String,Seq[String]]):Seq[(String,Seq[String])] =
@@ -48,7 +54,16 @@ case class S3Request(httpVerb:HTTPVerb,
   }
 }
 
-class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) {  self:S3RequestExecutor =>
+class S3Client(implicit creds:AWSCreds,ec:ExecutionContext){ self:S3RequestExecutor =>
+  def listBuckets:Future[S3BucketListing] = exec(
+    S3Request(
+      httpVerb = GET
+    )
+  ) flatMap { bytes => S3BucketListing(new String(bytes)).toFuture }
+}
+
+class S3BucketOperations(bucket:S3Bucket)(implicit creds:AWSCreds, ec:ExecutionContext) {  self:S3RequestExecutor =>
+  val S3Bucket(bucketName, bucketCreationDate) = bucket
 
   def put(file:File) = exec(
     S3Request(
@@ -76,7 +91,7 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
   ) map(new String(_))
 
   def listAll(prefix:Option[String]):Future[Set[S3Item]] = {
-    def listAllHelper(lastList:Future[S3Listing], acc:Set[S3Item]):Future[Set[S3Item]] = lastList.flatMap{ ll =>
+    def listAllHelper(lastList:Future[S3BucketContents], acc:Set[S3Item]):Future[Set[S3Item]] = lastList.flatMap{ ll =>
       if(!ll.truncated) Future { acc ++ ll.items }
       else {
         import utils.FutureHelper._
@@ -87,7 +102,7 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
     listAllHelper(list(prefix = prefix),Set())
   }
 
-  def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[S3Listing] = exec(
+  def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[S3BucketContents] = exec(
     S3Request(
       httpVerb = GET,
       bucket   = Option(bucketName),
@@ -96,23 +111,34 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
                 ("max-keys" -> maxKeys.map(_.toString)) +++
                 ("marker"   -> marker)
     )
-  ) flatMap { bytes => S3Listing(new String(bytes)).toFuture }
+  ) flatMap { bytes => S3BucketContents(new String(bytes)).toFuture }
 
 }
 
 object S3Item {
   def apply(key:String, lastModified:String, size:String):Try[S3Item] = Try {
 
-    val date = Try { S3ResultDate.parse(lastModified) } recover {
-      case _  => new Date(0)
-    }
-
-    S3Item(key, date.get, java.lang.Double.parseDouble(size).toLong)
+    S3Item(key, S3ResultDate(lastModified).recover{ case _ => new Date(0)}.get, java.lang.Double.parseDouble(size).toLong)
   }
 }
 
-object S3Listing {
-  def apply(xmlString:String):Try[S3Listing] = Try {
+object S3BucketListing {
+  def apply(xmlString:String):Try[S3BucketListing] = Try {
+    val xmlNode = XML.loadString(xmlString)
+    val buckets =
+    for {
+        buckets      <- xmlNode \ "Buckets"
+        bucket       <- buckets \ "Bucket"
+        bucketName   =  (bucket \ "Name").text
+        creationDate =  (bucket \ "CreationDate").text
+    } yield S3Bucket(bucketName, S3ResultDate(creationDate).toOption)
+
+    new S3BucketListing(buckets.toList)
+  }
+}
+
+object S3BucketContents {
+  def apply(xmlString:String):Try[S3BucketContents] = Try {
     val xmlNode   = XML.loadString(xmlString)
     val truncated = (xmlNode \ "IsTruncated").text.toBoolean
     val marker    = (xmlNode \ "Marker").text.trim match {
@@ -128,7 +154,7 @@ object S3Listing {
                       size         = (contentItem \ "Size").text
     } yield S3Item(key, lastModified, size)
 
-    flatten(tItems) map {items => S3Listing(items, truncated, marker) }
+    flatten(tItems) map {items => S3BucketContents(items, truncated, marker) }
 
   }.flatten
 }
