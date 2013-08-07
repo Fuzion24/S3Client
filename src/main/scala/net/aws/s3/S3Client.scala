@@ -7,11 +7,12 @@ import java.util.Date
 import net.aws.s3.HTTPVerb._
 import scala.xml.XML
 import scala.Some
+import scala.util.{Failure, Success, Try}
+import utils.FutureHelper._
 
 object S3 {
   val BASE_URL = "s3.amazonaws.com"
 }
-
 
 case class S3Listing(items:Seq[S3Item], truncated:Boolean, marker:Option[String] = None)
 
@@ -47,8 +48,6 @@ case class S3Request(httpVerb:HTTPVerb,
   }
 }
 
-
-
 class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) {  self:S3RequestExecutor =>
 
   def put(file:File) = exec(
@@ -76,13 +75,16 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
     )
   ) map(new String(_))
 
-  def listAll:Future[Seq[S3Item]] = {
-    def listAllHelper(lastList:Future[S3Listing], acc:List[S3Item]):Future[List[S3Item]] = lastList.flatMap{ ll =>
+  def listAll(prefix:Option[String]):Future[Set[S3Item]] = {
+    def listAllHelper(lastList:Future[S3Listing], acc:Set[S3Item]):Future[Set[S3Item]] = lastList.flatMap{ ll =>
       if(!ll.truncated) Future { acc ++ ll.items }
-      else
-        listAllHelper(list(marker = Some(ll.items.last.key)), acc ++ ll.items)
+      else {
+        import utils.FutureHelper._
+        val futureList = Directly(3)(() => list(marker = Some(ll.items.last.key)))
+        listAllHelper(futureList, acc ++ ll.items)
+      }
     }
-    listAllHelper(list(),List())
+    listAllHelper(list(prefix = prefix),Set())
   }
 
   def list(prefix:Option[String] = None, maxKeys:Option[Int] = None, marker:Option[String] = None):Future[S3Listing] = exec(
@@ -94,17 +96,23 @@ class S3Bucket(bucketName:String)(implicit creds:AWSCreds, ec:ExecutionContext) 
                 ("max-keys" -> maxKeys.map(_.toString)) +++
                 ("marker"   -> marker)
     )
-  ) map { bytes => S3Listing(new String(bytes)) }
+  ) flatMap { bytes => S3Listing(new String(bytes)).toFuture }
 
 }
 
 object S3Item {
-  def apply(key:String,lastModified:String,size:String):S3Item =
-    S3Item(key, S3ResultDate.parse(lastModified), Integer.parseInt(size))
+  def apply(key:String, lastModified:String, size:String):Try[S3Item] = Try {
+
+    val date = Try { S3ResultDate.parse(lastModified) } recover {
+      case _  => new Date(0)
+    }
+
+    S3Item(key, date.get, java.lang.Double.parseDouble(size).toLong)
+  }
 }
 
 object S3Listing {
-  def apply(xmlString:String):S3Listing = {
+  def apply(xmlString:String):Try[S3Listing] = Try {
     val xmlNode   = XML.loadString(xmlString)
     val truncated = (xmlNode \ "IsTruncated").text.toBoolean
     val marker    = (xmlNode \ "Marker").text.trim match {
@@ -112,7 +120,7 @@ object S3Listing {
       case s:String => Some(s)
     }
 
-    val items = for { contents     <- xmlNode \ "Contents"
+    val tItems = for { contents     <- xmlNode \ "Contents"
                       contentItem  <- contents
                       key          = (contentItem \ "Key").text
                       eTag         = (contentItem \ "ETag").text
@@ -120,8 +128,9 @@ object S3Listing {
                       size         = (contentItem \ "Size").text
     } yield S3Item(key, lastModified, size)
 
-    S3Listing(items, truncated, marker)
-  }
+    flatten(tItems) map {items => S3Listing(items, truncated, marker) }
+
+  }.flatten
 }
 
 
