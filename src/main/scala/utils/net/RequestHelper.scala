@@ -24,12 +24,12 @@ object RequestHelper {
 
     def maybeAddPutBody(body:Option[String]):RequestBuilder = body match {
       case None =>    req
-      case Some(b) => req.PUT.setBody(b)
+      case Some(b) => req.PUT.toRequestBuilder.setBody(b)
     }
 
     def maybeAddPostBody(body:Option[String]):RequestBuilder = body match {
       case None    => req
-      case Some(b) => req.POST.setBody(b)
+      case Some(b) => req.POST.toRequestBuilder.setBody(b)
     }
   }
 

@@ -64,7 +64,7 @@ object AWSS3 extends Build {
       }
     },
     libraryDependencies ++= Seq(
-	    "net.databinder.dispatch" %% "dispatch-core" % "0.10.1",
+	    "net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
       "org.scalatest"           %% "scalatest"     % Versions.scalatest % "test",
       "com.twitter"             %% "finagle-core"  % Versions.finagle,
       "com.twitter"             %% "finagle-http"  % Versions.finagle,
