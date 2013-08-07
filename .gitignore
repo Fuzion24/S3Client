@@ -10,4 +10,4 @@ boot/
 .DS_Store
 .idea
 .idea_modules
-src/test/scala/IntegrationTester.scala
+src/test/scala/PrivateTestValues.scala
