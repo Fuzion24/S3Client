@@ -27,11 +27,10 @@ class LiveS3Test extends FunSuite with BeforeAndAfter{
   }
 
   test("List Operation"){
-    pending
     val prefixes = (0 to 3).map(_.toString) ++ ('a' to 'f').map(_.toString)
     val fLists = prefixes map {p => s3bucket.listAll(Option(p))}
     val lists:Future[Set[S3Item]] = Future.sequence(fLists).map{ ll => ll.flatten.toSet }
-    val files = Await.result(lists, 10 minutes)
+    val files = Await.result(lists, 30 minutes)
   }
 
 
