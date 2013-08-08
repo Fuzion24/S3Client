@@ -7,7 +7,7 @@ object S3RequestSigner {
     HMACSHA1(creds.secretAccessKey, getRequestString(req)).asBase64
 
   private def getRequestString(req:S3Request):String = {
-    val S3Request(httpVerb, bucket, resource, contentMD5, contentType, date, amzHeaders, urlParams) = req
+    val S3Request(httpVerb, bucket, resource, contentMD5, contentType, requestBody, date, amzHeaders, urlParams) = req
     s"""$httpVerb
           |${contentMD5.getOrElse("")}
           |${contentType.getOrElse("")}

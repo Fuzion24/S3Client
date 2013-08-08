@@ -1,6 +1,5 @@
 package net.aws.s3
 
-import java.io.File
 import scala.concurrent.{ExecutionContext, Future}
 import utils.MapHelper._
 import java.util.Date
@@ -31,6 +30,7 @@ case class S3Request(httpVerb:HTTPVerb,
                      resource:     Option[String] = None,
                      contentMD5:   Option[String] = None,
                      contentType:  Option[String] = None,
+                     body:         Option[Array[Byte]] = None,
                      date:Either[Date,String] = Left(new Date()),
                      amzHeaders:Map[String,Seq[String]] = Map(),
                      urlParams:    Map[String,String] = Map()){
@@ -65,7 +65,9 @@ class S3Client(implicit creds:AWSCreds,ec:ExecutionContext){ self:S3RequestExecu
 class S3BucketOperations(bucket:S3Bucket)(implicit creds:AWSCreds, ec:ExecutionContext) {  self:S3RequestExecutor =>
   val S3Bucket(bucketName, bucketCreationDate) = bucket
 
-  def put(file:File) = exec(
+  def presignedURL(s3Req:S3Request, expirationDate:Option[Date] = None):String = ""
+
+  def put(key:S3Key,data:Array[Byte]) = exec(
     S3Request(
       httpVerb    = PUT,
       bucket      = Option(bucketName),
