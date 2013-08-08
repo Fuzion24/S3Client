@@ -15,7 +15,7 @@ Downloading a file:
 
 ```scala
   implicit val reds = AWSCreds("XXXXXXXXXXXXX", "XXXXXXXXXXXXXXX")
-  val s3bucket      = new S3BucketOperations(S3Bucket(")) with DispatchS3HTTPExecutor
+  val s3bucket      = new S3BucketOperations(S3Bucket("BUCKETNAME")) with DispatchS3HTTPExecutor
   val s3client      = new S3Client with DispatchS3HTTPExecutor
   val file          = s3bucket.get(S3Key("S3KEYHERE"))   
 ```
